@@ -66,7 +66,7 @@ def main():
     parser.add_argument("-mode", help=Fore.YELLOW + "Hashcat mode to use.", required=True)
     parser.add_argument("-wordlist-url", help=Fore.YELLOW + "URL of the wordlist (e.g., https://example.com/wordlist.gz). Must be a tar.gz, zip, or 7z file.", required=False)
     parser.add_argument("-pre-wordlist-url", choices=["rockyou" , "seclists"], help=Fore.YELLOW + "Pre-defined wordlist options. Currently only rockyou and seclists is supported.", required=False)
-    parser.add_argument("-seclist-path", help=Fore.YELLOW + "Path to the specific SecList file to use. Ex: Seclists/Passwords/seasons.txt", required=True)
+    parser.add_argument("-seclist-path", help=Fore.YELLOW + "Path to the specific SecList file to use. Ex: Seclists/Passwords/seasons.txt", required=False)
     parser.add_argument("-ruleset", choices=["best64", "best66", "dive", "oneruletorulethemall"],help=Fore.YELLOW + "The ruleset to use when cracking the hash with hashcat.", required=False)
     
     
@@ -77,6 +77,12 @@ def main():
     wordlist_url = args.wordlist_url
     pre_wordlist_url = args.pre_wordlist_url
     ruleset = args.ruleset
+
+    # Validate that at least one wordlist option is provided
+    if wordlist_url is None and pre_wordlist_url is None:
+        print(Fore.RED + "Error: You must provide either -wordlist-url or -pre-wordlist-url")
+        parser.print_help()
+        exit(1)
 
 # List of pre-defined wordlists to use. 
     if pre_wordlist_url == "rockyou":
@@ -92,13 +98,14 @@ def main():
     elif ruleset == "dive":
         ruleset = "hashcat/rules/dive" 
     elif ruleset == "oneruletorulethemall":
-        ruleset_url = "https://github.com/NotSoSecure/password_cracking_rules/raw/master/OneRuleToRuleThemAll.rule"
+        #ruleset_url = "https://github.com/NotSoSecure/password_cracking_rules/raw/master/OneRuleToRuleThemAll.rule"
+        ruleset_url = "https://github.com/NotSoSecure/password_cracking_rules.git"
         ruleset_filename = "OneRuleToRuleThemAll.rule"
         download_command = f"git clone {ruleset_filename} {ruleset_url}"
         run_command(download_command)
         ruleset = ruleset_filename
 
-    # You can change the instance type to a differnt device if you want to use a more powerful instance and how many GPUs you want to use by changing the number in the num_gpus"
+    # You can change the instance type to a different device if you want to use a more powerful instance and how many GPUs you want to use by changing the number in the num_gpus"
     print(Fore.GREEN + "Searching for an appropriate instance...")
     search_command = (
         "vastai search offers 'datacenter = True disk_space > 50 inet_down>1000 gpu_name = RTX_4090 num_gpus > 6' "
@@ -128,35 +135,52 @@ def main():
     instance_ssh_url = run_command(instance_ssh_url_command, capture_output=True)
     print(instance_ssh_url)
     
-    rockyou_filename = wordlist_url.split("/")[-1]
-    wordlist_filename = wordlist_url
+    # Handle different wordlist types
     if pre_wordlist_url == "rockyou":
+        rockyou_filename = "rockyou.txt.gz"
         rockyou_download_command = (
-            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -o {rockyou_filename} {wordlist_url};mv rockyou.txt.gz\\?inline\\=false rockyou.txt.gz; gunzip rockyou.txt.gz'"
+            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -O {rockyou_filename} {wordlist_url}; mv rockyou.txt.gz\\?inline\\=false rockyou.txt.gz; gunzip rockyou.txt.gz'"
         )
         run_command(rockyou_download_command)
+        wordlist_filename = "rockyou.txt"
     elif pre_wordlist_url == "seclists":
         seclists_download_command = (
-            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; git clone {wordlist_url};'"
+            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; git clone {wordlist_url}'"
         )        
         run_command(seclists_download_command)
-        
-    if wordlist_url.endswith(".zip"):
-        wordlist_download_command = (
-            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -o {wordlist_filename} {wordlist_url}; unzip {wordlist_filename}'"
-        )
-    elif wordlist_url.endswith(".7z"):
-        wordlist_download_command = (
-            f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -o {wordlist_filename} {wordlist_url}; 7z x {wordlist_filename}'"
-        )
-    run_command(wordlist_download_command)
-    
-    if wordlist_url == None and pre_wordlist_url == None: print(Fore.RED + "Invalid wordlist. Please provide a valid wordlist URL or choose a pre-defined wordlist option.")
+        wordlist_filename = args.seclist_path
+    else:
+        # Handle custom wordlist URL
+        wordlist_filename = wordlist_url.split("/")[-1]
+        if wordlist_url.endswith(".zip"):
+            wordlist_download_command = (
+                f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -O {wordlist_filename} {wordlist_url}; unzip {wordlist_filename}'"
+            )
+            run_command(wordlist_download_command)
+        elif wordlist_url.endswith(".7z"):
+            wordlist_download_command = (
+                f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -O {wordlist_filename} {wordlist_url}; 7z x {wordlist_filename}'"
+            )
+            run_command(wordlist_download_command)
+        else:
+            wordlist_download_command = (
+                f"ssh -i hashcrack -o StrictHostKeyChecking=no {instance_ssh_url} 'sudo apt -y install gzip 7zip nano git; wget -O {wordlist_filename} {wordlist_url}'"
+            )
+            run_command(wordlist_download_command)
 
     print(Fore.GREEN + "Starting a tmux session...")
-    login_command = f"ssh -i hashcrack {instance_ssh_url} 'tmux new-session -d -s ssh_tmux || true'"
-    run_command(login_command)
-    # root@ssh4.vast.ai:18318
+    # Create a new tmux session or attach to existing one
+    tmux_setup_commands = [
+        'tmux new-session -d -s ssh_tmux 2>/dev/null || true',
+        'tmux has-session -t ssh_tmux 2>/dev/null || tmux new-session -d -s ssh_tmux',
+        'tmux set-option -t ssh_tmux remain-on-exit on'
+    ]
+    
+    for cmd in tmux_setup_commands:
+        login_command = f"ssh -i hashcrack {instance_ssh_url} '{cmd}'"
+        run_command(login_command)
+        time.sleep(1)  # Give tmux time to initialize
+
     instance_ssh_url_parts = instance_ssh_url.split('@')
     ssh_hostname = instance_ssh_url_parts[1].split(':')[0]
     ssh_port = instance_ssh_url_parts[1].split(':')[1]
@@ -171,28 +195,30 @@ def main():
         if ruleset:
             hashcat_command = (
                 f"ssh -i hashcrack {instance_ssh_url} "
-                f"\"tmux send-keys -t ssh_tmux \\\"hashcat -a 0 -m {mode} {hash_file} {seclist_path} -r {ruleset} -o cracked.txt\" ENTER\""
+                f"'tmux send-keys -t ssh_tmux \"hashcat -a 0 -m {mode} {hash_file} {seclist_path} -r {ruleset} -o cracked.txt\" C-m'"
             )
         else:
             hashcat_command = (
                 f"ssh -i hashcrack {instance_ssh_url} "
-                f"\"tmux send-keys -t ssh_tmux \\\"hashcat -a 0 -m {mode} {hash_file} {seclist_path} -o cracked.txt\" ENTER\""
+                f"'tmux send-keys -t ssh_tmux \"hashcat -a 0 -m {mode} {hash_file} {seclist_path} -o cracked.txt\" C-m'"
             )
     elif ruleset and wordlist_filename:
         hashcat_command = (
             f"ssh -i hashcrack {instance_ssh_url} "
-            f"\"tmux send-keys -t ssh_tmux \\\"hashcat -a 0 -m {mode} {hash_file} {wordlist_filename} -r {ruleset} -o cracked.txt\" ENTER\""
+            f"'tmux send-keys -t ssh_tmux \"hashcat -a 0 -m {mode} {hash_file} {wordlist_filename} -r {ruleset} -o cracked.txt\" C-m'"
         )
     elif ruleset:
         hashcat_command = (
             f"ssh -i hashcrack {instance_ssh_url} "
-            f"\"tmux send-keys -t ssh_tmux \\\"hashcat -a 0 -m {mode} {hash_file} -r {ruleset} -o cracked.txt\" ENTER\""
+            f"'tmux send-keys -t ssh_tmux \"hashcat -a 0 -m {mode} {hash_file} -r {ruleset} -o cracked.txt\" C-m'"
         )
     else:
         hashcat_command = (
             f"ssh -i hashcrack {instance_ssh_url} "
-            f"\"tmux send-keys -t ssh_tmux \\\"hashcat -a 0 -m {mode} {hash_file} {wordlist_filename} -o cracked.txt\" ENTER\""
+            f"'tmux send-keys -t ssh_tmux \"hashcat -a 0 -m {mode} {hash_file} {wordlist_filename} -o cracked.txt\" C-m'"
         )
+    
+    print(Fore.CYAN + "Debug: Executing command: " + hashcat_command)
     run_command(hashcat_command)
 
     print(Fore.GREEN + "Checking if hashes have been cracked...")
