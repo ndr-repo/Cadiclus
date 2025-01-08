@@ -319,7 +319,7 @@ function Execute-Commands {
 
 # Main Execution using $args to pass multiple commands
 if ($args.Count -eq 0) {
-    Write-Host "`n[!] No commands specified. Use './script.ps1 Show-Help' for available options."
+    Write-Host "`n[!] No commands specified. Use './cadiclus.ps1 Show-Help' for available options."
 } else {
     Execute-Commands -commands $args
 }
