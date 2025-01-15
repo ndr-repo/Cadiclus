@@ -30,6 +30,8 @@ Available Command Options:
 - Check-ADJoinStatus
 - Get-Drives
 - Get-NetworkActivity
+- Test-Breakout
+- Get-LinuxServices
 - Get-LoggedInUsers
 - Check-AVInstalled
 - Check-CredentialManagerInstalled
@@ -58,6 +60,8 @@ function Run-All {
     Check-ADJoinStatus
     Get-Drives
     Get-NetworkActivity
+    Test-Breakout
+    Get-LinuxServices 
     Get-LoggedInUsers
     Check-AVInstalled
     Check-CredentialManagerInstalled
@@ -151,6 +155,109 @@ function Get-NetworkActivity {
     } | Format-Table -AutoSize
     Write-Output $routeNetworkActivity
 }
+
+# Define the function to check if we can escape our shell in PowerShell.
+function Test-Breakout {
+    param (
+        [string[]]$Shells = @('bash', 'sh', 'zsh') # List of shells to test
+    )
+
+    Write-Output "[+] Testing breakout to alternative shells..."
+    $breakoutResults = @()
+
+    foreach ($shell in $Shells) {
+        Write-Output "[+] Checking for $shell..."
+
+        # Check if the shell exists in the system PATH
+        if (Get-Command $shell -ErrorAction SilentlyContinue) {
+            Write-Output "$shell found. Attempting to spawn $shell in a subshell..."
+
+            try {
+                # Spawn the shell as a subshell using a new process
+                Start-Process -FilePath $shell -ArgumentList "-c", "'exit'" -NoNewWindow -Wait
+                Write-Output "Successfully spawned and exited $shell."
+                $breakoutResults += [PSCustomObject]@{
+                    Shell   = $shell
+                    Status  = "Success"
+                }
+            } catch {
+                Write-Warning "Failed to spawn $shell."
+                $breakoutResults += [PSCustomObject]@{
+                    Shell   = $shell
+                    Status  = "Failed"
+                }
+            }
+        } else {
+            Write-Warning "$shell not found in PATH."
+            $breakoutResults += [PSCustomObject]@{
+                Shell   = $shell
+                Status  = "Not Found"
+            }
+        }
+    }
+
+    Write-Output "[+] Breakout testing completed. Results:"
+    $breakoutResults | Format-Table -AutoSize
+}
+
+# Define the function to get a list of running services
+function Get-LinuxServices {
+    [CmdletBinding()]
+    param ()
+
+    Write-Output "[+] Gathering a list of running services on the Linux system..."
+
+    $services = @()
+
+    try {
+        # Check if the system uses systemd (common in modern Linux distributions)
+        if (Test-Path "/etc/systemd/system/") {
+            Write-Output "[+] Systemd detected. Gathering service information..."
+            # Read service files from the systemd folder
+            $serviceFiles = Get-ChildItem -Path "/etc/systemd/system/" -Recurse -Filter "*.service" -ErrorAction SilentlyContinue
+            foreach ($file in $serviceFiles) {
+                # Extract service details
+                $serviceName = $file.Name
+                $servicePath = $file.FullName
+                $status = if (Test-Path "/var/run/${serviceName}") { "Running" } else { "Stopped" }
+
+                $services += [PSCustomObject]@{
+                    Name   = $serviceName
+                    Path   = $servicePath
+                    Status = $status
+                }
+            }
+        } elseif (Test-Path "/etc/init.d/") {
+            Write-Output "[+] SysVinit detected. Gathering service information..."
+            # Read service files from init.d
+            $initFiles = Get-ChildItem -Path "/etc/init.d/" -ErrorAction SilentlyContinue
+            foreach ($file in $initFiles) {
+                # Extract service details
+                $serviceName = $file.Name
+                $servicePath = $file.FullName
+                $status = if (Test-Path "/var/run/${serviceName}") { "Running" } else { "Stopped" }
+
+                $services += [PSCustomObject]@{
+                    Name   = $serviceName
+                    Path   = $servicePath
+                    Status = $status
+                }
+            }
+        } else {
+            Write-Warning "No recognizable service management system found."
+        }
+
+        if ($services.Count -gt 0) {
+            Write-Output "[+] Services retrieved successfully. Displaying results:"
+            $services | Format-Table -AutoSize
+        } else {
+            Write-Output "[+] No services found on the system."
+        }
+    } catch {
+        Write-Warning "An error occurred while retrieving services: $_"
+    }
+}
+
 
 # Define the function to check for currently logged-in users
 function Get-LoggedInUsers {
