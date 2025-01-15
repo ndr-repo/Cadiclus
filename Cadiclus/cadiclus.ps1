@@ -399,7 +399,7 @@ function Review-PShistory {
 }
 
 function Check-Programs {
-    $programs = @("nmap", "netcat", "curl", "wget", "ssh", "ftp", "gcc", "g++", "make", "python", "ruby", "perl")
+    $programs = @("nmap", "netcat", "curl", "wget", "ssh", "ftp", "gcc", "g++", "make", "python", "ruby", "perl", "python3")
     Write-Host "`n[+] Checking for installed programs..."
     foreach ($program in $programs) {
         if (Get-Command $program -ErrorAction SilentlyContinue) {
