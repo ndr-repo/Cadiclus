@@ -41,6 +41,7 @@ Available Command Options:
 - Review-UserHistory
 - Review-PSHistory
 - Check-Programs
+- Invoke-CredentialHunting (Standalone)
 
 Running Cadiclus:
 
@@ -48,6 +49,8 @@ Show me everything:
 ./cadiclus.ps1 Run-All
 Show me certain information by running multiple commands:
 ./cadiclus.ps1 Get-OSInfo Get-Drives Check-AVInstalled
+Search for credential patterns in files:
+./cadiclus.ps1 Invoke-CredentialHunting "/dir/to/crawl"
 
 "@
     Write-Host $helpText
@@ -410,6 +413,56 @@ function Check-Programs {
     }
 }
 
+# Define the function to check files for password and API key / token-like patterns - by t3l3machus 
+function Invoke-CredentialHunting {
+    param(
+        [string]$RootDir = "/"
+    )
+
+    # Regex patterns 
+    $regexPatterns = @{
+        "credentials" = ".{0,10}passw.{0,10}[\=\:]{1,2} *[\S]{2,64}"  # e.g., DB_PASSWORD = "qwerty!@#"", secret-password: 12345!@#
+        "tokens" = "(?:[a-z0-9]{0,15}api|access|secret|token)(?:_|__|\-|\.\ )?(?:[a-z0-9]{0,15}key|token|secret|val|value|tok3n|k3y)? *[\=\:]{1,2} *[\S]{4,128}"  # Matches API key / token-like patterns
+    }
+
+    Write-Host "[+] Searching for credentials and API / token-like values in $RootDir"
+    
+    try {
+        # Search files while excluding large binaries and extensions unlikely to contain credentials, and symlinks
+        # The "-Attributes !ReparsePoint" in Get-ChildItem ensures that symbolic links are excluded from the search. A symlink that points back to itself or creates a loop can cause errors.
+        Get-ChildItem -Path $RootDir -Recurse -File -ErrorAction SilentlyContinue -Exclude *.exe,*.dll,*.so,*.bin,*.jpg,*.jpeg,*.png,*.gif,*.bmp,*.font,*.woff,*.mp4,*.mp3,*.zip,*.tar,*.gz,*.rar,*.7z,*.kdbx,*.vmdk,*.vdi,*.vhd,*.vhdx,*.qcow2*,*.css,*.iso,*.jar,*.war -Attributes !ReparsePoint 2> $null | 
+        ForEach-Object {
+            try { 
+                $file = $_.FullName
+                $fileContent = Get-Content $file -Raw
+                if ([string]::IsNullOrEmpty($fileContent)) {
+                    Continue
+                }
+
+                $regexPatterns.Keys | ForEach-Object {
+                    $key = $_
+                    $pattern = $regexPatterns[$_]
+                    $matches = [regex]::Matches($fileContent, $regexPatterns[$_], [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
+                    if ($matches.Count -gt 0) {
+                        Write-Host "[" -NoNewline
+                        Write-Host "`e[38;5;214m!`e[0m" -NoNewline
+                        Write-Host "] Potential $_ found in: " -NoNewline
+                        Write-Host "`e[38;5;214m$($file)`e[0m"
+                        $matches | ForEach-Object {
+                            Write-Host "   "$_.Value
+                        }
+                    }
+                }
+            } catch {
+                Write-Host "[X] Error processing file $file"
+            }
+        }
+    } catch {
+        Write-Host "[X] Error accessing $RootDir"
+    }
+}
+
 # Function to handle multiple command executions
 function Execute-Commands {
     param (
@@ -424,9 +477,19 @@ function Execute-Commands {
     }
 }
 
-# Main Execution using $args to pass multiple commands
 if ($args.Count -eq 0) {
     Write-Host "`n[!] No commands specified. Use './cadiclus.ps1 Show-Help' for available options."
+} elseif ($args[0] -ieq "Invoke-CredentialHunting") {
+    $RootDir = "/"
+    # If an additional argument exists, use it as RootDir
+    if ($args.Count -gt 1 -and -not [string]::IsNullOrEmpty($args[1])) {
+        $RootDir = $args[1]
+        if (-not (Test-Path -Path $RootDir -PathType Container)) {
+            Write-Host "[X] Error: '$RootDir' is not a valid directory."
+            Exit 1
+        }
+    }
+    Invoke-CredentialHunting -RootDir $RootDir
 } else {
     Execute-Commands -commands $args
 }
