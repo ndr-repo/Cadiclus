@@ -434,7 +434,7 @@ function Invoke-CredentialHunting {
         ForEach-Object {
             try { 
                 $file = $_.FullName
-                $fileContent = Get-Content $file -Raw
+                $fileContent = Get-Content $file -Raw -ErrorAction SilentlyContinue
                 if ([string]::IsNullOrEmpty($fileContent)) {
                     Continue
                 }
