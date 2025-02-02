@@ -13,7 +13,7 @@ For specific guidance on each tool, consult their respective documentation and o
 
 **Please note that these pentesting tools are provided for educational purposes only.**
 
-I, the author of this repository, am not the creator of these tools. They are developed and maintained by various individuals and organizations within the cybersecurity community. This repository serves as a curated list of such tools that I have found useful for assessments and cyber competitions.
+  Some of these tools contained in this repository were not created by me. They are developed and maintained by various individuals and organizations within the cybersecurity community. This repository serves as a curated list of such tools that I have found useful for assessments and cyber competitions.
 
 **I am not responsible for any actions or consequences resulting from the misuse of these tools for illegal, unethical, or malicious purposes.** Users of these tools are solely responsible for their actions and must use them within the bounds of applicable laws and ethical guidelines.
 
