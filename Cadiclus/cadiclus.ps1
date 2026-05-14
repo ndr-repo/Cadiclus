@@ -9,13 +9,14 @@ $banner = @"
 ███    ███   ███    ███ ███   ▄███ ███  ███    ███ ███▌    ▄ ███    ███    ▄█    ███
 ████████▀    ███    █▀  ████████▀  █▀   ████████▀  █████▄▄██ ████████▀   ▄████████▀
 
-                                     Version 1.0
+                                     Version 1.5
                                      Created by: TJ Null
+                                     Updated by: Gabriel H. @weekndr_sec
 
 "@
 
 # Print the ASCII banner
-Write-Host $banner
+Write-Output $banner
 
 # Function to display help if requested by the user
 function Show-Help {
@@ -39,7 +40,8 @@ Available Command Options:
 - Search-AWSCredentials
 - Search-AzureCredentials
 - Review-UserHistory
-- Review-PSHistory
+- Get-PSHistory
+- Search-PSHistory
 - Check-Programs
 - Invoke-CredentialHunting (Standalone)
 
@@ -52,12 +54,16 @@ Show me certain information by running multiple commands:
 Search for credential patterns in files:
 ./cadiclus.ps1 Invoke-CredentialHunting "/dir/to/crawl"
 
+New Functions:
+- Get-PSHistory
+- Search-PSHistory
+
 "@
-    Write-Host $helpText
+    Write-Output $helpText
 }
 
 function Run-All {
-    Write-Host "`n[+] Running all functions..."
+    Write-Output "`n[+] Running all functions..."
 
     Get-OSInfo
     Check-ADJoinStatus
@@ -71,10 +77,10 @@ function Run-All {
     Search-AWSCredentials
     Search-AzureCredentials
     Review-UserHistory
-    Review-PSHistory
+    Get-PSHistory
     Check-Programs
 
-    Write-Host "`n[+] All functions executed."
+    Write-Output "`n[+] All functions executed."
 }
 
 # Define the function to get OS information and kernel version
@@ -90,35 +96,35 @@ function Get-OSInfo {
         }
     }
 
-    Write-Host "`n[+] Operating System Kernel Version:"
-    Write-Host $osInfo
-    Write-Host "`n[+] OS Release Information:"
+    Write-Output "`n[+] Operating System Kernel Version:"
+    Write-Output $osInfo
+    Write-Output "`n[+] OS Release Information:"
     foreach ($key in $osRelease.Keys) {
-        Write-Host "$key = $($osRelease[$key])"
+        Write-Output "$key = $($osRelease[$key])"
     }
 }
 
 # Define the function to check if the system is joined to a domain controller
 function Check-ADJoinStatus {
-    Write-Host "`n[+] Checking if the system is joined to an Active Directory domain..."
+    Write-Output "`n[+] Checking if the system is joined to an Active Directory domain..."
 
     if (Test-Path "$(which realm)") {
         $adStatus = realm list | Select-String -Pattern 'domain-name'
 
         if ($adStatus) {
-            Write-Host "The system is joined to an Active Directory domain."
+            Write-Output "The system is joined to an Active Directory domain."
         } else {
-            Write-Host "The system is not joined to an Active Directory domain."
+            Write-Output "The system is not joined to an Active Directory domain."
         }
     } else {
-        Write-Host "The 'realm' command is not installed on this system."
+        Write-Output "The 'realm' command is not installed on this system."
     }
 }
 
 # Define the function to check for local and network drives
 function Get-Drives {
     $drives = Get-PSDrive
-    Write-Host "`n[+] List of Local and Network Drives:"
+    Write-Output "`n[+] List of Local and Network Drives:"
     $drives | Format-Table -AutoSize Name, @{Label="Provider";Expression={$_.Provider}}, Root, 
         @{Label="Used (GB)";Expression={[math]::round($_.Used/1GB,2)}}, 
         @{Label="Free (GB)";Expression={[math]::round($_.Free/1GB,2)}}
@@ -126,7 +132,7 @@ function Get-Drives {
 
 # Define the function to check for current network connections
 function Get-NetworkActivity {
-    Write-Host "`n[+] Grabbing current network connections..."
+    Write-Output "`n[+] Grabbing current network connections..."
     $networkActivity = ss -ntlp | ForEach-Object {
         $columns = $_ -split '\s+'
         if ($columns.Count -ge 6) {
@@ -142,7 +148,7 @@ function Get-NetworkActivity {
     } | Format-Table -AutoSize
     Write-Output $networkActivity
 
-    Write-Host "`n[+] Grabbing current routing information..."
+    Write-Output "`n[+] Grabbing current routing information..."
     $routeNetworkActivity = route -n | Select-String -Pattern '(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)' | ForEach-Object {
         $matches = $_.Matches[0].Groups
         [PSCustomObject]@{
@@ -265,8 +271,8 @@ function Get-LinuxServices {
 # Define the function to check for currently logged-in users
 function Get-LoggedInUsers {
     $loggedInUsers = who
-    Write-Host "`n[+] Currently Logged-In Users:"
-    Write-Host $loggedInUsers
+    Write-Output "`n[+] Currently Logged-In Users:"
+    Write-Output $loggedInUsers
 }
 
 # Define the function to check if Antivirus is currently installed
@@ -275,9 +281,9 @@ function Check-AVInstalled {
     $installedPackages = dpkg-query -W -f='${Package}\n'
     $avInstalled = $avPackages | ForEach-Object { $installedPackages -contains $_ }
     if ($avInstalled -contains $true) {
-        Write-Host "`n[+] Antivirus software is installed on the system."
+        Write-Output "`n[+] Antivirus software is installed on the system."
     } else {
-        Write-Host "`n[+] Antivirus software is not installed on the system."
+        Write-Output "`n[+] Antivirus software is not installed on the system."
     }
 }
 
@@ -286,15 +292,15 @@ function Check-CredentialManagerInstalled {
     $installed = $credentialManagers | ForEach-Object { which $_ }
     $installedManagers = $installed -ne $null
     if ($installedManagers) {
-        Write-Host "`n[+] Credential management tools are installed on the system."
+        Write-Output "`n[+] Credential management tools are installed on the system."
     } else {
-        Write-Host "`n[+] Credential management tools are not installed on the system."
+        Write-Output "`n[+] Credential management tools are not installed on the system."
     }
 }
 
 # Function to search for .ps1 files on the target
 function Search-PS1Files {
-    Write-Host "Searching for .ps1 files in all directories..."
+    Write-Output "Searching for .ps1 files in all directories..."
 
     $ErrorActionPreference = 'SilentlyContinue'
 
@@ -315,7 +321,7 @@ function Search-PS1Files {
 
         Write-Progress -Activity "Searching .ps1 files" -Status "Complete" -PercentComplete 100
     } else {
-        Write-Host "No .ps1 files found."
+        Write-Output "No .ps1 files found."
     }
 
     $ErrorActionPreference = 'Continue'
@@ -325,7 +331,7 @@ function Search-PS1Files {
 }
 
 function Search-AWSCredentials {
-    Write-Host "`n[+] Searching for AWS credentials on the system..."
+    Write-Output "`n[+] Searching for AWS credentials on the system..."
 
     $ErrorActionPreference = 'SilentlyContinue'
 
@@ -338,7 +344,7 @@ function Search-AWSCredentials {
     # Search for credentials in common paths
     foreach ($path in $pathsToSearch) {
         if (Test-Path $path) {
-            Write-Host "`nChecking $path for AWS credentials..."
+            Write-Output "`nChecking $path for AWS credentials..."
             $content = Get-Content $path
 
             $awsAccessKeys = $content | Select-String -Pattern 'aws_access_key_id'
@@ -346,28 +352,28 @@ function Search-AWSCredentials {
             $awsSessionTokens = $content | Select-String -Pattern 'aws_session_token'
 
             if ($awsAccessKeys) {
-                Write-Host "`nAWS Access Keys found in $path"
-                $awsAccessKeys | ForEach-Object { Write-Host $_.Line }
+                Write-Output "`nAWS Access Keys found in $path"
+                $awsAccessKeys | ForEach-Object { Write-Output $_.Line }
             }
 
             if ($awsSecretKeys) {
-                Write-Host "`nAWS Secret Keys found in $path"
-                $awsSecretKeys | ForEach-Object { Write-Host $_.Line }
+                Write-Output "`nAWS Secret Keys found in $path"
+                $awsSecretKeys | ForEach-Object { Write-Output $_.Line }
             }
 
             if ($awsSessionTokens) {
-                Write-Host "`nAWS Session Tokens found in $path"
-                $awsSessionTokens | ForEach-Object { Write-Host $_.Line }
+                Write-Output "`nAWS Session Tokens found in $path"
+                $awsSessionTokens | ForEach-Object { Write-Output $_.Line }
             }
         } else {
-            Write-Host "$path not found."
+            Write-Output "$path not found."
         }
     }
 
     # Search for credentials in environment variables
     $awsEnvVars = Get-ChildItem Env: | Where-Object { $_.Name -match 'AWS_' }
     if ($awsEnvVars) {
-        Write-Host "`nAWS credentials found in environment variables:"
+        Write-Output "`nAWS credentials found in environment variables:"
         $awsEnvVars | Format-Table -AutoSize Name, Value
     }
 
@@ -375,40 +381,64 @@ function Search-AWSCredentials {
 }
 
 function Search-AzureCredentials {
-    Write-Host "`n[+] Searching for Azure credentials on the system..."
+    Write-Output "`n[+] Searching for Azure credentials on the system..."
     $azureCredentialsPath = "$HOME/.azure/credentials"
 
     if (Test-Path $azureCredentialsPath) {
         $azureCredentials = Get-Content $azureCredentialsPath
-        Write-Host "`nAzure credentials found:"
-        $azureCredentials | ForEach-Object { Write-Host $_ }
+        Write-Output "`nAzure credentials found:"
+        $azureCredentials | ForEach-Object { Write-Output $_ }
     } else {
-        Write-Host "`nAzure credentials not found."
+        Write-Output "`nAzure credentials not found."
     }
 }
 
 function Review-UserHistory {
-    Write-Host "`n[+] Reviewing user history..."
+    Write-Output "`n[+] Reviewing user history..."
     $userHistory = Get-Content ~/.bash_history
-    Write-Host "`n[+] User Command History:"
-    $userHistory | ForEach-Object { Write-Host $_ }
+    Write-Output "`n[+] User Command History:"
+    $userHistory | ForEach-Object { Write-Output $_ }
 }
 
-function Review-PShistory {
-    Write-Host "`n[+] Reviewing user PowerShell history..."
-    $userPSHistory = Get-History
-    Write-Host "`n[+] Users Powershell Command History:"
-    $userPSHistory | ForEach-Object { Write-Host $_ }
+function Get-PSHistory {
+    [CmdletBinding()]
+    param(
+        [switch]$Unique
+    )
+
+    Write-Output "`n[+] Reviewing user PowerShell history..."
+
+    $userPSHistory = Get-Content -Encoding UTF8 (Get-PSReadLineOption).HistorySavePath
+
+    if ($Unique) {
+        $userPSHistory = $userPSHistory | Sort-Object -Unique
+    }
+
+    Write-Output "`n[+] Users Powershell Command History:"
+    $userPSHistory | ForEach-Object { Write-Output $_ }
+}
+
+function Search-PSHistory {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Pattern,
+        [switch]$SimpleMatch,
+        [switch]$Unique
+    )
+    Write-Output "`n[+] Matched Powershell Command History:"
+    Get-PSHistory -Unique:$Unique |
+        Select-String -Pattern $Pattern -SimpleMatch:$SimpleMatch | ForEach-Object { Write-Output $_}
 }
 
 function Check-Programs {
     $programs = @("nmap", "netcat", "curl", "wget", "ssh", "ftp", "gcc", "g++", "make", "python", "ruby", "perl", "python3")
-    Write-Host "`n[+] Checking for installed programs..."
+    Write-Output "`n[+] Checking for installed programs..."
     foreach ($program in $programs) {
         if (Get-Command $program -ErrorAction SilentlyContinue) {
-            Write-Host "[+] $program is installed."
+            Write-Output "[+] $program is installed."
         } else {
-            Write-Host "[-] $program is not installed."
+            Write-Output "[-] $program is not installed."
         }
     }
 }
@@ -425,7 +455,7 @@ function Invoke-CredentialHunting {
         "tokens" = "(?:[a-z0-9]{0,15}api|access|secret|token)(?:_|__|\-|\.\ )?(?:[a-z0-9]{0,15}key|token|secret|val|value|tok3n|k3y)? *[\=\:]{1,2} *[\S]{4,128}"  # Matches API key / token-like patterns
     }
 
-    Write-Host "[+] Searching for credentials and API / token-like values in $RootDir"
+    Write-Output "[+] Searching for credentials and API / token-like values in $RootDir"
     
     try {
         # Search files while excluding large binaries and extensions unlikely to contain credentials, and symlinks
@@ -445,21 +475,21 @@ function Invoke-CredentialHunting {
                     $matches = [regex]::Matches($fileContent, $regexPatterns[$_], [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
                     if ($matches.Count -gt 0) {
-                        Write-Host "[" -NoNewline
-                        Write-Host "`e[38;5;214m!`e[0m" -NoNewline
-                        Write-Host "] Potential $_ found in: " -NoNewline
-                        Write-Host "`e[38;5;214m$($file)`e[0m"
+                        Write-Output "[" -NoNewline
+                        Write-Output "`e[38;5;214m!`e[0m" -NoNewline
+                        Write-Output "] Potential $_ found in: " -NoNewline
+                        Write-Output "`e[38;5;214m$($file)`e[0m"
                         $matches | ForEach-Object {
-                            Write-Host "   "$_.Value
+                            Write-Output "   "$_.Value
                         }
                     }
                 }
             } catch {
-                Write-Host "[X] Error processing file $file"
+                Write-Output "[X] Error processing file $file"
             }
         }
     } catch {
-        Write-Host "[X] Error accessing $RootDir"
+        Write-Output "[X] Error accessing $RootDir"
     }
 }
 
@@ -472,20 +502,20 @@ function Execute-Commands {
         if (Get-Command $command -ErrorAction SilentlyContinue) {
             Invoke-Expression $command
         } else {
-            Write-Host "`n[!] Unknown command: $command"
+            Write-Output "`n[!] Unknown command: $command"
         }
     }
 }
 
 if ($args.Count -eq 0) {
-    Write-Host "`n[!] No commands specified. Use './cadiclus.ps1 Show-Help' for available options."
+    Write-Output "`n[!] No commands specified. Use './cadiclus.ps1 Show-Help' for available options."
 } elseif ($args[0] -ieq "Invoke-CredentialHunting") {
     $RootDir = "/"
     # If an additional argument exists, use it as RootDir
     if ($args.Count -gt 1 -and -not [string]::IsNullOrEmpty($args[1])) {
         $RootDir = $args[1]
         if (-not (Test-Path -Path $RootDir -PathType Container)) {
-            Write-Host "[X] Error: '$RootDir' is not a valid directory."
+            Write-Output "[X] Error: '$RootDir' is not a valid directory."
             Exit 1
         }
     }
